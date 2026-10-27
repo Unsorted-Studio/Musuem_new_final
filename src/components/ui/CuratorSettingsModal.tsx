@@ -37,24 +37,89 @@ export const CuratorSettingsModal: React.FC<CuratorSettingsModalProps> = ({
   const [isPlayingPreview, setIsPlayingPreview] = useState(soundtrack.getIsPlaying());
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
 
-  // Handle local song file upload (MP3/WAV) with persistent database storage
+  // ---------- AUDIO UPLOAD ----------
   const handleAudioFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setIsUploadingAudio(true);
-      try {
-        const permanentUrl = await uploadMediaAsset(file);
-        if (permanentUrl) {
-          setCustomAudio(permanentUrl);
-          setSongId('custom');
-          soundtrack.setTrack('custom', permanentUrl);
-        }
-      } catch (err) {
-        console.error('Audio upload failed:', err);
-      } finally {
-        setIsUploadingAudio(false);
-      }
+    if (!file) return;
+
+    // Soft limit – large files as data URLs can break Firestore sync
+    if (file.size > 8 * 1024 * 1024) {
+      setUploadError('Audio should be under ~8 MB so it can sync to partners.');
+      e.target.value = '';
+      return;
+    }
+
+    setIsUploadingAudio(true);
+    setUploadError(null);
+    setUploadSuccess(null);
+
+    try {
+      const permanentUrl = await uploadMediaAsset(file);
+      if (!permanentUrl) throw new Error('Upload returned empty URL');
+
+      setCustomAudio(permanentUrl);
+      setSongId('custom');
+      soundtrack.setTrack('custom', permanentUrl);
+      soundtrack.play(); // start playing immediately
+
+      // Save to Firebase right away (same as images)
+      onSaveSettings({
+        selectedSongId: 'custom',
+        customAudioUrl: permanentUrl,
+        cinemaVideoUrl: videoUrl,
+      });
+
+      setUploadSuccess('Soundtrack uploaded and applied!');
+    } catch (err: any) {
+      console.error('Audio upload failed:', err);
+      setUploadError(err?.message || 'Audio upload failed. Try a smaller file or paste a URL.');
+    } finally {
+      setIsUploadingAudio(false);
+      e.target.value = '';
+    }
+  };
+
+  // ---------- VIDEO UPLOAD ----------
+  const handleVideoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Firestore docs max ~1 MB. Data-URL videos must stay small.
+    if (file.size > 2 * 1024 * 1024) {
+      setUploadError(
+        'Video is too large (>2 MB) for automatic sync. Please paste a direct MP4/WebM URL instead (hosted on Google Drive, Firebase Storage, etc.).'
+      );
+      e.target.value = '';
+      return;
+    }
+
+    setIsUploadingVideo(true);
+    setUploadError(null);
+    setUploadSuccess(null);
+
+    try {
+      const permanentUrl = await uploadMediaAsset(file);
+      if (!permanentUrl) throw new Error('Upload returned empty URL');
+
+      setVideoUrl(permanentUrl);
+
+      // Save to Firebase right away
+      onSaveSettings({
+        selectedSongId: songId,
+        customAudioUrl: customAudio,
+        cinemaVideoUrl: permanentUrl,
+      });
+
+      setUploadSuccess('Cinema video uploaded and applied!');
+    } catch (err: any) {
+      console.error('Video upload failed:', err);
+      setUploadError(err?.message || 'Video upload failed. Try a smaller file or paste a URL.');
+    } finally {
+      setIsUploadingVideo(false);
+      e.target.value = '';
     }
   };
 
@@ -80,7 +145,6 @@ export const CuratorSettingsModal: React.FC<CuratorSettingsModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-sans">
       <div className="w-full max-w-lg bg-[#151518] border border-white/10 rounded-3xl p-6 sm:p-7 text-stone-100 shadow-2xl animate-in fade-in duration-200 max-h-[92vh] overflow-y-auto">
-        
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-5">
           <div className="flex items-center gap-2.5">
@@ -100,7 +164,7 @@ export const CuratorSettingsModal: React.FC<CuratorSettingsModalProps> = ({
           </button>
         </div>
 
-        {/* Tab switcher: 2 tabs (Soundtrack & Cinema Video) */}
+        {/* Tab switcher */}
         <div className="grid grid-cols-2 gap-2 p-1 bg-white/5 border border-white/10 rounded-xl mb-5 text-xs font-medium">
           <button
             onClick={() => setActiveTab('music')}
@@ -113,7 +177,6 @@ export const CuratorSettingsModal: React.FC<CuratorSettingsModalProps> = ({
             <Music className="w-3.5 h-3.5" />
             <span>Soundtrack</span>
           </button>
-
           <button
             onClick={() => setActiveTab('video')}
             className={`py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
@@ -159,7 +222,9 @@ export const CuratorSettingsModal: React.FC<CuratorSettingsModalProps> = ({
 
             {/* Curated Track Options List */}
             <div className="space-y-2">
-              <span className="text-xs text-stone-400 block mb-1 font-medium">Curated Classical Repertoire:</span>
+              <span className="text-xs text-stone-400 block mb-1 font-medium">
+                Curated Classical Repertoire:
+              </span>
               {SOUNDTRACK_OPTIONS.map((track) => (
                 <div
                   key={track.id}
@@ -210,6 +275,12 @@ export const CuratorSettingsModal: React.FC<CuratorSettingsModalProps> = ({
                   className="hidden"
                 />
               </label>
+              {uploadError && activeTab === 'music' && (
+                <p className="text-xs text-rose-400 mt-2">{uploadError}</p>
+              )}
+              {uploadSuccess && activeTab === 'music' && (
+                <p className="text-xs text-emerald-400 mt-2">{uploadSuccess}</p>
+              )}
             </div>
           </div>
         )}
@@ -221,113 +292,49 @@ export const CuratorSettingsModal: React.FC<CuratorSettingsModalProps> = ({
           <div className="space-y-4">
             <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-[11px] text-rose-200 leading-relaxed flex items-center gap-2.5">
               <Video className="w-4 h-4 text-rose-400 shrink-0" />
-              <span>
-                Customize the video playing on the cinema room screen.
-              </span>
+              <span>Customize the video playing on the cinema room screen.</span>
             </div>
 
             {/* Upload Video File */}
             <div>
               <label className="text-xs text-stone-300 block mb-1.5 font-medium">
-                Upload Romantic Video File (MP4, WebM, MOV):
+                Upload Romantic Video File (MP4, WebM, MOV) — max ~2 MB:
               </label>
               <label className="flex flex-col items-center justify-center p-4 bg-white/5 hover:bg-white/10 border border-dashed border-white/20 hover:border-rose-400/50 rounded-2xl cursor-pointer text-xs text-stone-300 transition-all">
                 {isUploadingVideo ? (
                   <>
                     <Loader2 className="w-6 h-6 text-rose-400 mb-1 animate-spin" />
-                    <span className="font-medium text-rose-300">Uploading and saving video to database...</span>
-                    <span className="text-[10px] text-stone-400 mt-0.5">Please wait a moment while it finishes</span>
+                    <span className="font-medium text-rose-300">
+                      Uploading and saving video to database...
+                    </span>
+                    <span className="text-[10px] text-stone-400 mt-0.5">
+                      Please wait a moment while it finishes
+                    </span>
                   </>
                 ) : (
                   <>
                     <Upload className="w-5 h-5 text-rose-400 mb-1" />
                     <span className="font-medium text-stone-200">Click to Select Video from Device</span>
-                    <span className="text-[10px] text-stone-400 mt-0.5">MP4, WebM, QuickTime (.mov) supported</span>
+                    <span className="text-[10px] text-stone-400 mt-0.5">
+                      MP4, WebM, QuickTime (.mov) supported — keep under 2 MB
+                    </span>
                   </>
                 )}
                 <input
                   type="file"
                   accept="video/mp4,video/webm,video/quicktime"
                   disabled={isUploadingVideo}
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setIsUploadingVideo(true);
-                      try {
-                        const permanentUrl = await uploadMediaAsset(file);
-                        if (permanentUrl) {
-                          setVideoUrl(permanentUrl);
-                        }
-                      } catch (err) {
-                        console.error('Video upload failed:', err);
-                      } finally {
-                        setIsUploadingVideo(false);
-                      }
-                    }
-                  }}
+                  onChange={handleVideoFileUpload}
                   className="hidden"
                 />
               </label>
+              {uploadError && activeTab === 'video' && (
+                <p className="text-xs text-rose-400 mt-2">{uploadError}</p>
+              )}
+              {uploadSuccess && activeTab === 'video' && (
+                <p className="text-xs text-emerald-400 mt-2">{uploadSuccess}</p>
+              )}
             </div>
 
             {/* Direct Video URL Link Input */}
             <div>
-              <label className="text-xs text-stone-300 block mb-1 font-medium">
-                Or Paste Direct Video URL (MP4 / WebM Link)
-              </label>
-              <input
-                type="text"
-                value={videoUrl}
-                onChange={(e) => setVideoUrl(e.target.value)}
-                placeholder="https://.../video.mp4"
-                className="w-full px-3 py-2 bg-black/50 border border-white/15 rounded-xl text-xs text-stone-100 focus:outline-none focus:border-rose-400 font-mono"
-              />
-            </div>
-
-            {/* Current screen mode / Reset to celestial cinema */}
-            <div className="pt-2 border-t border-white/10">
-              <div className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10">
-                <div>
-                  <span className="text-xs font-medium text-stone-200 block">
-                    {videoUrl ? 'Custom Video Loaded' : 'Celestial Cinema Reel Active'}
-                  </span>
-                  <span className="text-[10px] text-stone-400 block mt-0.5">
-                    {videoUrl
-                      ? 'Playing your custom video on the cinema screen.'
-                      : 'Playing animated romantic cosmic nebula and starlight projection.'}
-                  </span>
-                </div>
-                {videoUrl && (
-                  <button
-                    type="button"
-                    onClick={() => setVideoUrl('')}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-stone-300 hover:text-white text-xs transition-colors"
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                    <span>Reset to Celestial</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="pt-5 mt-5 border-t border-white/10 flex items-center justify-end gap-2.5">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-white/10 hover:bg-white/15 text-stone-300 text-xs rounded-xl transition-colors font-medium"
-          >
-            Close
-          </button>
-          <button
-            onClick={handleApply}
-            className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-stone-950 text-xs rounded-xl font-semibold transition-colors shadow-lg"
-          >
-            Save & Sync Museum
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
