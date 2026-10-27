@@ -71,16 +71,17 @@ export function subscribeFrames(
 }
 
 /**
- * Helper to upload a media file (photo, soundtrack, cinema video) to the permanent backend storage.
- * Returns the permanent public URL (e.g. /uploads/12345.jpg).
+ * Helper to upload a media file (photo, soundtrack, cinema video).
+ * Tries the backend first. If backend is unavailable (e.g. on Vercel),
+ * falls back to a data URL so the file still plays.
  */
 export async function uploadMediaAsset(
   fileOrPayload: File | { filename: string; data: string }
 ): Promise<string> {
-  try {
-    let filename = '';
-    let data = '';
+  let filename = '';
+  let data = '';
 
+  try {
     if (fileOrPayload instanceof File) {
       filename = fileOrPayload.name;
       data = await new Promise<string>((resolve, reject) => {
@@ -103,17 +104,31 @@ export async function uploadMediaAsset(
     if (res.ok) {
       const result = await res.json();
       if (result.url) {
-        return result.url;
+        // Make absolute so partner devices can load it
+        const absolute = result.url.startsWith('http')
+          ? result.url
+          : `${window.location.origin}${result.url}`;
+        return absolute;
       }
     }
   } catch (err) {
-    console.warn('Backend upload server unreachable or error, falling back:', err);
+    console.warn('Backend upload unreachable, using data URL fallback:', err);
   }
 
-  // Fallback to data URL directly if backend unavailable
-  return typeof fileOrPayload === 'object' && 'data' in fileOrPayload
-    ? fileOrPayload.data
-    : '';
+  // Always fall back to the data URL we already read
+  if (data) return data;
+
+  // Extra safety if something went wrong before reading the file
+  if (fileOrPayload instanceof File) {
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(fileOrPayload);
+    });
+  }
+
+  return (fileOrPayload as { data: string }).data || '';
 }
 
 /**
@@ -161,7 +176,7 @@ export async function persistMuseumConfig(config: Partial<MuseumConfig>): Promis
 
   try {
     const configDocRef = doc(db, 'museum_config', CONFIG_DOC_ID);
-    
+
     // Clean payload according to allowed schema
     const payload: Record<string, any> = {
       updatedAt: new Date().toISOString(),
