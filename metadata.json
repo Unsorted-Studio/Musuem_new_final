@@ -1,0 +1,6 @@
+{
+  "name": "OUR MUSEUM",
+  "description": "An explorable, romantic 3D couple's museum featuring grand halls, custom photo galleries, dedication wall, private cinema room, and animated avatars.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

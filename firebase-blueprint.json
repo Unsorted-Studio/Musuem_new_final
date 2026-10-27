@@ -1,0 +1,128 @@
+{
+  "entities": {
+    "MuseumConfig": {
+      "title": "MuseumConfig",
+      "description": "Exhibition configuration including dedication text, background song, and cinema video.",
+      "type": "object",
+      "properties": {
+        "coupleNames": {
+          "type": "string",
+          "description": "Display names of the couple",
+          "maxLength": 100
+        },
+        "partner1": {
+          "type": "string",
+          "description": "Name of admin partner",
+          "maxLength": 50
+        },
+        "partner2": {
+          "type": "string",
+          "description": "Name of invited partner",
+          "maxLength": 50
+        },
+        "anniversaryDate": {
+          "type": "string",
+          "description": "Anniversary date string",
+          "maxLength": 50
+        },
+        "title": {
+          "type": "string",
+          "description": "Museum banner title",
+          "maxLength": 100
+        },
+        "subtitle": {
+          "type": "string",
+          "description": "Museum subtitle",
+          "maxLength": 200
+        },
+        "dedicationLetter": {
+          "type": "string",
+          "description": "Love letter dedication displayed on the lectern",
+          "maxLength": 5000
+        },
+        "selectedSongId": {
+          "type": "string",
+          "description": "ID of the chosen soundtrack",
+          "maxLength": 100
+        },
+        "customAudioUrl": {
+          "type": "string",
+          "description": "Optional custom music audio URL",
+          "maxLength": 2000
+        },
+        "cinemaVideoUrl": {
+          "type": "string",
+          "description": "Custom video URL for the cinema screen",
+          "maxLength": 2000
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp or server timestamp string of last modification",
+          "maxLength": 50
+        }
+      },
+      "required": ["coupleNames", "partner1", "partner2", "title", "dedicationLetter", "selectedSongId"]
+    },
+    "PictureFrame": {
+      "title": "PictureFrame",
+      "description": "Wall-mounted art pieces and photos in the museum gallery",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique frame identifier",
+          "maxLength": 64
+        },
+        "roomId": {
+          "type": "string",
+          "description": "Gallery room key",
+          "enum": ["entrance", "memories", "whispers", "cinema"]
+        },
+        "title": {
+          "type": "string",
+          "description": "Artwork or memory title",
+          "maxLength": 150
+        },
+        "date": {
+          "type": "string",
+          "description": "Memory date or tag",
+          "maxLength": 50
+        },
+        "story": {
+          "type": "string",
+          "description": "Backstory or caption",
+          "maxLength": 3000
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "Image data URL or asset path",
+          "maxLength": 1000000
+        },
+        "width": {
+          "type": "number",
+          "description": "Frame width in 3D units"
+        },
+        "height": {
+          "type": "number",
+          "description": "Frame height in 3D units"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp string of last modification",
+          "maxLength": 50
+        }
+      },
+      "required": ["id", "roomId", "title", "story"]
+    }
+  },
+  "firestore": {
+    "/museum_config/{configId}": {
+      "schema": "MuseumConfig",
+      "description": "Global museum settings, music track, cinema video, and dedication letter."
+    },
+    "/frames/{frameId}": {
+      "schema": "PictureFrame",
+      "description": "Curated artworks and photos mounted on gallery walls."
+    }
+  }
+}

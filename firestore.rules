@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function isValidMuseumConfig(data) {
+      return (!('title' in data) || data.title is string)
+        && (!('coupleNames' in data) || data.coupleNames is string)
+        && (!('partner1' in data) || data.partner1 is string)
+        && (!('partner2' in data) || data.partner2 is string)
+        && (!('playerName' in data) || data.playerName is string)
+        && (!('partnerName' in data) || data.partnerName is string)
+        && (!('selectedSongId' in data) || data.selectedSongId is string)
+        && (!('dedicationLetter' in data) || data.dedicationLetter is string)
+        && (!('anniversaryDate' in data) || data.anniversaryDate is string)
+        && (!('subtitle' in data) || data.subtitle is string)
+        && (!('customAudioUrl' in data) || data.customAudioUrl is string)
+        && (!('cinemaVideoUrl' in data) || data.cinemaVideoUrl is string)
+        && (!('updatedAt' in data) || data.updatedAt is string);
+    }
+
+    function isValidPictureFrame(data) {
+      return data.id is string && isValidId(data.id)
+        && (!('roomId' in data) || data.roomId in ['entrance', 'memories', 'whispers', 'cinema'])
+        && (!('title' in data) || data.title is string)
+        && (!('date' in data) || data.date is string)
+        && (!('story' in data) || data.story is string)
+        && (!('imageUrl' in data) || data.imageUrl is string)
+        && (!('width' in data) || data.width is number)
+        && (!('height' in data) || data.height is number)
+        && (!('aspectRatio' in data) || data.aspectRatio is number)
+        && (!('updatedAt' in data) || data.updatedAt is string);
+    }
+
+    match /museum_config/{configId} {
+      allow read: if isValidId(configId);
+      allow create, update: if isValidId(configId) && isValidMuseumConfig(incoming());
+      allow delete: if isValidId(configId);
+    }
+
+    match /frames/{frameId} {
+      allow read: if isValidId(frameId);
+      allow create, update: if isValidId(frameId) && isValidPictureFrame(incoming());
+      allow delete: if isValidId(frameId);
+    }
+  }
+}
