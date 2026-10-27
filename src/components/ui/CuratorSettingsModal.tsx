@@ -338,3 +338,69 @@ export const CuratorSettingsModal: React.FC<CuratorSettingsModalProps> = ({
 
             {/* Direct Video URL Link Input */}
             <div>
+              <label className="text-xs text-stone-300 block mb-1 font-medium">
+                Or Paste Direct Video URL (MP4 / WebM Link) — best for larger videos:
+              </label>
+              <input
+                type="text"
+                value={videoUrl}
+                onChange={(e) => setVideoUrl(e.target.value)}
+                placeholder="https://.../video.mp4"
+                className="w-full px-3 py-2 bg-black/50 border border-white/15 rounded-xl text-xs text-stone-100 focus:outline-none focus:border-rose-400 font-mono"
+              />
+            </div>
+
+            {/* Current screen mode / Reset to celestial cinema */}
+            <div className="pt-2 border-t border-white/10">
+              <div className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10">
+                <div>
+                  <span className="text-xs font-medium text-stone-200 block">
+                    {videoUrl ? 'Custom Video Loaded' : 'Celestial Cinema Reel Active'}
+                  </span>
+                  <span className="text-[10px] text-stone-400 block mt-0.5">
+                    {videoUrl
+                      ? 'Playing your custom video on the cinema screen.'
+                      : 'Playing animated romantic cosmic nebula and starlight projection.'}
+                  </span>
+                </div>
+                {videoUrl && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVideoUrl('');
+                      onSaveSettings({
+                        selectedSongId: songId,
+                        customAudioUrl: customAudio,
+                        cinemaVideoUrl: '',
+                      });
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-stone-300 hover:text-white text-xs transition-colors"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Reset to Celestial</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="pt-5 mt-5 border-t border-white/10 flex items-center justify-end gap-2.5">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-white/10 hover:bg-white/15 text-stone-300 text-xs rounded-xl transition-colors font-medium"
+          >
+            Close
+          </button>
+          <button
+            onClick={handleApply}
+            className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-stone-950 text-xs rounded-xl font-semibold transition-colors shadow-lg"
+          >
+            Save & Sync Museum
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
