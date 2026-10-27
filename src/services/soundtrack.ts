@@ -57,36 +57,38 @@ class RomanticSoundtrack {
   // Track chord progressions
   private progressions: Record<string, Array<{ bass: number; notes: number[]; speed: number }>> = {
     'clair-de-lune': [
-      { bass: 138.59, notes: [207.65, 277.18, 329.63, 415.30], speed: 4200 },
-      { bass: 110.00, notes: [164.81, 220.00, 277.18, 329.63], speed: 4200 },
-      { bass: 92.50, notes: [138.59, 185.00, 220.00, 277.18], speed: 4200 },
-      { bass: 123.47, notes: [185.00, 246.94, 277.18, 369.99], speed: 4200 },
+      { bass: 138.59, notes: [207.65, 277.18, 329.63, 415.3], speed: 4200 },
+      { bass: 110.0, notes: [164.81, 220.0, 277.18, 329.63], speed: 4200 },
+      { bass: 92.5, notes: [138.59, 185.0, 220.0, 277.18], speed: 4200 },
+      { bass: 123.47, notes: [185.0, 246.94, 277.18, 369.99], speed: 4200 },
     ],
     'chopin-nocturne': [
-      { bass: 155.56, notes: [233.08, 311.13, 392.00, 466.16], speed: 3800 },
-      { bass: 130.81, notes: [196.00, 261.63, 311.13, 392.00], speed: 3800 },
+      { bass: 155.56, notes: [233.08, 311.13, 392.0, 466.16], speed: 3800 },
+      { bass: 130.81, notes: [196.0, 261.63, 311.13, 392.0], speed: 3800 },
       { bass: 116.54, notes: [174.61, 233.08, 293.66, 349.23], speed: 3800 },
       { bass: 103.83, notes: [155.56, 207.65, 261.63, 311.13], speed: 3800 },
     ],
     'canon-in-d': [
-      { bass: 146.83, notes: [220.00, 293.66, 369.99, 440.00], speed: 3600 },
-      { bass: 98.00, notes: [146.83, 196.00, 246.94, 293.66], speed: 3600 },
-      { bass: 110.00, notes: [164.81, 220.00, 261.63, 329.63], speed: 3600 },
+      { bass: 146.83, notes: [220.0, 293.66, 369.99, 440.0], speed: 3600 },
+      { bass: 98.0, notes: [146.83, 196.0, 246.94, 293.66], speed: 3600 },
+      { bass: 110.0, notes: [164.81, 220.0, 261.63, 329.63], speed: 3600 },
       { bass: 82.41, notes: [123.47, 164.81, 207.65, 246.94], speed: 3600 },
-      { bass: 87.31, notes: [130.81, 174.61, 220.00, 261.63], speed: 3600 },
-      { bass: 73.42, notes: [110.00, 146.83, 185.00, 220.00], speed: 3600 },
+      { bass: 87.31, notes: [130.81, 174.61, 220.0, 261.63], speed: 3600 },
+      { bass: 73.42, notes: [110.0, 146.83, 185.0, 220.0], speed: 3600 },
     ],
     'moonlight-sonata': [
-      { bass: 138.59, notes: [164.81, 220.00, 277.18, 329.63], speed: 4500 },
-      { bass: 123.47, notes: [146.83, 196.00, 246.94, 293.66], speed: 4500 },
-      { bass: 110.00, notes: [138.59, 174.61, 220.00, 277.18], speed: 4500 },
+      { bass: 138.59, notes: [164.81, 220.0, 277.18, 329.63], speed: 4500 },
+      { bass: 123.47, notes: [146.83, 196.0, 246.94, 293.66], speed: 4500 },
+      { bass: 110.0, notes: [138.59, 174.61, 220.0, 277.18], speed: 4500 },
       { bass: 103.83, notes: [123.47, 164.81, 207.65, 246.94], speed: 4500 },
     ],
   };
 
   private ensureContext(): AudioContext {
     if (!this.ctx) {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       this.ctx = new AudioCtx();
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.setValueAtTime(this.volume, this.ctx.currentTime);
@@ -103,7 +105,18 @@ class RomanticSoundtrack {
     if (wasPlaying) this.pause();
 
     this.currentTrackId = trackId;
-    if (customUrl) {
+
+    if (customUrl && customUrl !== this.customAudioUrl) {
+      this.customAudioUrl = customUrl;
+      // Destroy old element so the new src is always used
+      if (this.customAudio) {
+        try {
+          this.customAudio.pause();
+          this.customAudio.src = '';
+        } catch {}
+        this.customAudio = null;
+      }
+    } else if (customUrl) {
       this.customAudioUrl = customUrl;
     }
 
@@ -127,14 +140,15 @@ class RomanticSoundtrack {
         if (!this.customAudio) {
           this.customAudio = new Audio(this.customAudioUrl);
           this.customAudio.loop = true;
-        } else {
-          this.customAudio.src = this.customAudioUrl;
+          this.customAudio.crossOrigin = 'anonymous';
         }
         this.customAudio.volume = this.volume;
-        this.customAudio.play().catch(() => {});
+        this.customAudio.play().catch((err) => {
+          console.warn('Custom audio play blocked or failed:', err);
+        });
         return;
-      } catch {
-        // Fallback to procedural
+      } catch (err) {
+        console.warn('Custom audio error, falling back to procedural:', err);
       }
     }
 
@@ -151,7 +165,7 @@ class RomanticSoundtrack {
 
       // Arpeggiate
       currentChord.notes.forEach((freq, i) => {
-        const delay = (i * 0.48) + (Math.random() * 0.04);
+        const delay = i * 0.48 + Math.random() * 0.04;
         setTimeout(() => {
           if (this.isPlaying) {
             this.synthesizePianoNote(freq, 0.2, 2.6, 'triangle');
@@ -163,7 +177,8 @@ class RomanticSoundtrack {
       if (step % 2 === 1) {
         setTimeout(() => {
           if (this.isPlaying) {
-            const highFreq = currentChord.notes[Math.floor(Math.random() * currentChord.notes.length)] * 2;
+            const highFreq =
+              currentChord.notes[Math.floor(Math.random() * currentChord.notes.length)] * 2;
             this.synthesizePianoNote(highFreq, 0.12, 3.0, 'sine');
           }
         }, 1900);
@@ -185,7 +200,9 @@ class RomanticSoundtrack {
       this.intervalId = null;
     }
     if (this.customAudio) {
-      this.customAudio.pause();
+      try {
+        this.customAudio.pause();
+      } catch {}
     }
   }
 
@@ -203,93 +220,55 @@ class RomanticSoundtrack {
     return this.isPlaying;
   }
 
-  public setVolume(vol: number): void {
-    this.volume = Math.max(0, Math.min(1, vol));
+  public setVolume(v: number): void {
+    this.volume = Math.max(0, Math.min(1, v));
     if (this.masterGain && this.ctx) {
-      this.masterGain.gain.setTargetAtTime(this.volume, this.ctx.currentTime, 0.05);
+      this.masterGain.gain.setValueAtTime(this.volume, this.ctx.currentTime);
     }
     if (this.customAudio) {
       this.customAudio.volume = this.volume;
     }
   }
 
-  private synthesizePianoNote(freq: number, gainLevel: number, duration: number, type: OscillatorType = 'sine'): void {
-    try {
-      const ctx = this.ensureContext();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const filter = ctx.createBiquadFilter();
+  private synthesizePianoNote(
+    freq: number,
+    volume: number,
+    duration: number,
+    type: OscillatorType = 'sine'
+  ): void {
+    if (!this.ctx || !this.masterGain) return;
 
-      osc.type = type;
-      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
 
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(820, ctx.currentTime);
-      filter.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + duration);
+    const now = this.ctx.currentTime;
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(volume * this.volume, now + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
-      const now = ctx.currentTime;
-      gain.gain.setValueAtTime(0.001, now);
-      gain.gain.linearRampToValueAtTime(gainLevel * this.volume, now + 0.09);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(this.masterGain || ctx.destination);
-
-      osc.start(now);
-      osc.stop(now + duration + 0.1);
-    } catch {}
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + duration + 0.1);
   }
 
   public playInspectChime(): void {
-    try {
-      const ctx = this.ensureContext();
-      [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
-        setTimeout(() => {
-          this.synthesizePianoNote(freq, 0.16, 1.6, 'sine');
-        }, idx * 90);
-      });
-    } catch {}
+    this.ensureContext();
+    if (!this.ctx || !this.masterGain) return;
+    const notes = [523.25, 659.25, 783.99];
+    notes.forEach((freq, i) => {
+      setTimeout(() => {
+        this.synthesizePianoNote(freq, 0.15, 0.8, 'sine');
+      }, i * 90);
+    });
   }
 
   public playCameraSwitch(): void {
-    try {
-      const ctx = this.ensureContext();
-      const now = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(330, now);
-      osc.frequency.exponentialRampToValueAtTime(440, now + 0.14);
-      gain.gain.setValueAtTime(0.06 * this.volume, now);
-      gain.gain.linearRampToValueAtTime(0.001, now + 0.16);
-      osc.connect(gain);
-      gain.connect(this.masterGain || ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.18);
-    } catch {}
-  }
-
-  private lastStepTime = 0;
-  public playFootstep(): void {
-    const now = Date.now();
-    if (now - this.lastStepTime < 380) return;
-    this.lastStepTime = now;
-    try {
-      const ctx = this.ensureContext();
-      const t = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(75 + Math.random() * 15, t);
-      osc.frequency.exponentialRampToValueAtTime(25, t + 0.07);
-      gain.gain.setValueAtTime(0.03 * this.volume, t);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
-      osc.connect(gain);
-      gain.connect(this.masterGain || ctx.destination);
-      osc.start(t);
-      osc.stop(t + 0.09);
-    } catch {}
+    this.ensureContext();
+    this.synthesizePianoNote(440, 0.12, 0.4, 'triangle');
+    setTimeout(() => this.synthesizePianoNote(554.37, 0.1, 0.5, 'sine'), 80);
   }
 }
 
